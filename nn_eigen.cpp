@@ -64,7 +64,9 @@ void label_to_one_hot(BYTE *labels, float *one_hot_labels, int num_labels) {
 }
 
 // sigmoid activation on float
-float sigmoid(float x) { return 1 / (1 + exp(-x)); }
+float sigmoid(float x) {
+    return 1 / (1 + exp(-x));
+}
 
 int main() {
     FILE *fp;
@@ -88,6 +90,7 @@ int main() {
         train_images[i] = (float)train_images_raw[i] / 255.0;
     }
 
+    /*
     for (int i = 0; i < num_rows; i++) {
         for (int j = 0; j < num_cols; j++) {
             if (train_images[i * num_cols + j] > 0) {
@@ -97,7 +100,8 @@ int main() {
             }
         }
         printf("\n");
-    }
+    } 
+    */
 
     fclose(fp);
 
@@ -216,6 +220,7 @@ int main() {
     free(one_hot_labels);
 
     // ***************** test *****************
+    std::cout << "\n\n ***** start testing *****\n" << std::endl;
     if ((fp = fopen("./data/t10k-labels.idx1-ubyte", "rb")) == NULL) {
         printf("File open error!");
         exit(1);
@@ -240,6 +245,8 @@ int main() {
     for (int i = 0; i < num_images * num_rows * num_cols; i++) {
         test_images[i] = (float)test_images_raw[i] / 255.0;
     }
+
+    std::cout<< "num_images: " << num_images << std::endl;
 
     int correct = 0;
     for (int i = 0; i < num_images; i++) {
@@ -266,7 +273,7 @@ int main() {
         }
     }
 
-    std::cout << "accuracy: " << (float)correct / num_images << std::endl;
+    std::cout << "\n\naccuracy: " << (float)correct / num_images << std::endl;
 
     return 0;
 }
