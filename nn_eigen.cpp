@@ -120,31 +120,31 @@ int main() {
     printf("\n");
 
     // ***************** 4 layer NN *****************
-    // layer 1: 784 -> 100
-    // layer 2: 100 -> 100
-    // layer 3: 100 -> 100
-    // layer 4: 100 -> 10
+    // layer 1: 784 -> 128
+    // layer 2: 128 -> 128
+    // layer 3: 128 -> 128
+    // layer 4: 128 -> 10
 
     // init layers
-    MatrixXf Z1(100, 1);
-    MatrixXf A1(100, 1);
-    MatrixXf Z2(100, 1);
-    MatrixXf A2(100, 1);
-    MatrixXf Z3(100, 1);
-    MatrixXf A3(100, 1);
+    MatrixXf Z1(128, 1);
+    MatrixXf A1(128, 1);
+    MatrixXf Z2(128, 1);
+    MatrixXf A2(128, 1);
+    MatrixXf Z3(128, 1);
+    MatrixXf A3(128, 1);
     MatrixXf Z4(10, 1);
     MatrixXf A4(10, 1);
 
     // init weights
-    MatrixXf W1 = MatrixXf::Random(100, 784);
-    MatrixXf W2 = MatrixXf::Random(100, 100);
-    MatrixXf W3 = MatrixXf::Random(100, 100);
-    MatrixXf W4 = MatrixXf::Random(10, 100);
+    MatrixXf W1 = MatrixXf::Random(128, 784);
+    MatrixXf W2 = MatrixXf::Random(128, 128);
+    MatrixXf W3 = MatrixXf::Random(128, 128);
+    MatrixXf W4 = MatrixXf::Random(10, 128);
 
     // init biases
-    MatrixXf b1 = MatrixXf::Random(100, 1);
-    MatrixXf b2 = MatrixXf::Random(100, 1);
-    MatrixXf b3 = MatrixXf::Random(100, 1);
+    MatrixXf b1 = MatrixXf::Random(128, 1);
+    MatrixXf b2 = MatrixXf::Random(128, 1);
+    MatrixXf b3 = MatrixXf::Random(128, 1);
     MatrixXf b4 = MatrixXf::Random(10, 1);
 
     // init one-hot labels
@@ -155,7 +155,7 @@ int main() {
     float learning_rate = 0.01;
 
     // init one matrix for ease of use
-    MatrixXf one = MatrixXf::Ones(100, 1);
+    MatrixXf one = MatrixXf::Ones(128, 1);
 
     // prepare for parallel
     Eigen::initParallel();
