@@ -63,10 +63,26 @@ void label_to_one_hot(BYTE *labels, float *one_hot_labels, int num_labels) {
     }
 }
 
-// sigmoid activation on float
-float sigmoid(float x) {
-    return 1 / (1 + exp(-x));
+// ReLU
+float relu(float x) { return (x > 0) ? x : 0; }
+
+// relu prime
+float relu_prime(float x) { return (x > 0) ? 1 : 0; }
+
+// final layer activation
+// column wise, normalize each column to sum to 1
+// return MatrixXf
+MatrixXf minemax(MatrixXf x, int num_rows, int num_cols) {
+    MatrixXf result(num_rows, num_cols);
+    for(int i=0; i<num_cols; i++) {
+        float max = x.col(i).maxCoeff();
+        result.col(i) = x.col(i)/max;
+    }
+    return result;
 }
+
+
+#define NUM_NODES 128
 
 int main() {
     FILE *fp;
@@ -119,93 +135,119 @@ int main() {
 
     printf("\n");
 
-    // ***************** 4 layer NN *****************
-    // layer 1: 784 -> 128
-    // layer 2: 128 -> 128
-    // layer 3: 128 -> 128
-    // layer 4: 128 -> 10
+    // ***************** 5 layer NN *****************
+
+    // map images to matrix
+    MatrixXf X(num_rows * num_cols, num_images);
+    for (int i = 0; i < num_images; i++) {
+        for (int j = 0; j < num_rows * num_cols; j++) {
+            X(j, i) = train_images[i * num_rows * num_cols + j];
+        }
+    }
+    
+    std::cout << "shape of X: " << X.rows() << " x "
+              << X.cols() << std::endl;
 
     // init layers
-    MatrixXf Z1(128, 1);
-    MatrixXf A1(128, 1);
-    MatrixXf Z2(128, 1);
-    MatrixXf A2(128, 1);
-    MatrixXf Z3(128, 1);
-    MatrixXf A3(128, 1);
-    MatrixXf Z4(10, 1);
-    MatrixXf A4(10, 1);
+    MatrixXf Z1(NUM_NODES, num_images);
+    MatrixXf A1(NUM_NODES, num_images);
+    MatrixXf Z2(NUM_NODES, num_images);
+    MatrixXf A2(NUM_NODES, num_images);
+    MatrixXf Z3(NUM_NODES, num_images);
+    MatrixXf A3(NUM_NODES, num_images);
+    MatrixXf Z4(NUM_NODES, num_images);
+    MatrixXf A4(NUM_NODES, num_images);
+    MatrixXf Z5(10, num_images);
+    MatrixXf A5(10, num_images);
 
     // init weights
-    MatrixXf W1 = MatrixXf::Random(128, 784);
-    MatrixXf W2 = MatrixXf::Random(128, 128);
-    MatrixXf W3 = MatrixXf::Random(128, 128);
-    MatrixXf W4 = MatrixXf::Random(10, 128);
+    MatrixXf W1 = MatrixXf::Random(NUM_NODES, 784);
+    MatrixXf W2 = MatrixXf::Random(NUM_NODES, NUM_NODES);
+    MatrixXf W3 = MatrixXf::Random(NUM_NODES, NUM_NODES);
+    MatrixXf W4 = MatrixXf::Random(NUM_NODES, NUM_NODES);
+    MatrixXf W5 = MatrixXf::Random(10, NUM_NODES);
 
     // init biases
-    MatrixXf b1 = MatrixXf::Random(128, 1);
-    MatrixXf b2 = MatrixXf::Random(128, 1);
-    MatrixXf b3 = MatrixXf::Random(128, 1);
-    MatrixXf b4 = MatrixXf::Random(10, 1);
+    MatrixXf b1 = MatrixXf::Random(NUM_NODES, 1);
+    MatrixXf b2 = MatrixXf::Random(NUM_NODES, 1);
+    MatrixXf b3 = MatrixXf::Random(NUM_NODES, 1);
+    MatrixXf b4 = MatrixXf::Random(NUM_NODES, 1);
+    MatrixXf b5 = MatrixXf::Random(10, 1);
 
     // init one-hot labels
     float *one_hot_labels = (float *)malloc(num_images * 10 * sizeof(float));
     label_to_one_hot(train_labels, one_hot_labels, num_images);
+    MatrixXf Y = MatrixXf::Map(one_hot_labels, 10, num_images);
+    std::cout << "shape of Y = " << Y.rows() << " x " << Y.cols() << std::endl;
 
     // init learning rate
-    float learning_rate = 0.01;
+    float learning_rate = 0.001;
 
     // init one matrix for ease of use
-    MatrixXf one = MatrixXf::Ones(128, 1);
+    MatrixXf one = MatrixXf::Ones(NUM_NODES, num_images);
+    MatrixXf one_T = MatrixXf::Ones(num_images, NUM_NODES);
+    MatrixXf column_one = MatrixXf::Ones(NUM_NODES, 1);
 
     // prepare for parallel
     Eigen::initParallel();
-
     // main loop
     std::cout << "start propagating" << std::endl;
     //timer
     auto start = std::chrono::high_resolution_clock::now();
 
-    #pragma omp parallel for num_threads(16)
-    for (int i = 0; i<100; i++){
-    for (int j = 0; j < num_images; j++) {
+    // bulk process the whole dataset instead of one by one
+    
+    for(int i = 0; i<100; i++){
         // forward propagation
-        Z1 = W1 * Map<MatrixXf>(train_images + j * 784, 784, 1) + b1;
-        A1 = Z1.unaryExpr(&sigmoid);
-        Z2 = W2 * A1 + b2;
-        A2 = Z2.unaryExpr(&sigmoid);
-        Z3 = W3 * A2 + b3;
-        A3 = Z3.unaryExpr(&sigmoid);
-        Z4 = W4 * A3 + b4;
-        A4 = Z4.unaryExpr(&sigmoid);
+        Z1 = W1 * X;
+        Z1.colwise() += b1.col(0);
+        A1 = Z1.unaryExpr(&relu);
+        Z2 = W2 * A1;
+        Z2.colwise() += b2.col(0);
+        A2 = Z2.unaryExpr(&relu);
+        Z3 = W3 * A2;
+        Z3.colwise() += b3.col(0);
+        A3 = Z3.unaryExpr(&relu);
+        Z4 = W4 * A3;
+        Z4.colwise() += b4.col(0);
+        A4 = Z4.unaryExpr(&relu);
+        Z5 = W5 * A4;
+        Z5.colwise() += b5.col(0);
+        A5 = minemax(Z5, 10, num_images);
+        
+        // backward propagation
 
-        // back propagation
-        MatrixXf dZ4 = A4 - Map<MatrixXf>(one_hot_labels + j * 10, 10, 1);
-        MatrixXf dW4 = dZ4 * A3.transpose();
-        MatrixXf db4 = dZ4;
+        MatrixXf dZ5 = A5 - Y;
+        MatrixXf dW5 = dZ5 * A4.transpose() / num_images;
+        MatrixXf db5 = dZ5.rowwise().sum() / num_images;
+        MatrixXf dZ4 = W5.transpose() * dZ5;
+        MatrixXf dW4 = dZ4 * A3.transpose() / num_images;
+        MatrixXf db4 = dZ4.rowwise().sum() / num_images;
         MatrixXf dZ3 = W4.transpose() * dZ4;
-        dZ3 = dZ3.cwiseProduct(A3.cwiseProduct(one - A3));
-        MatrixXf dW3 = dZ3 * A2.transpose();
-        MatrixXf db3 = dZ3;
+        dZ3 = dZ3.cwiseProduct(A3.unaryExpr(&relu_prime));
+        MatrixXf dW3 = dZ3 * A2.transpose() / num_images;
+        MatrixXf db3 = dZ3.rowwise().sum() / num_images;
         MatrixXf dZ2 = W3.transpose() * dZ3;
-        dZ2 = dZ2.cwiseProduct(A2.cwiseProduct(one - A2));
-        MatrixXf dW2 = dZ2 * A1.transpose();
-        MatrixXf db2 = dZ2;
+        dZ2 = dZ2.cwiseProduct(A2.unaryExpr(&relu_prime));
+        MatrixXf dW2 = dZ2 * A1.transpose() / num_images;
+        MatrixXf db2 = dZ2.rowwise().sum() / num_images;
         MatrixXf dZ1 = W2.transpose() * dZ2;
-        dZ1 = dZ1.cwiseProduct(A1.cwiseProduct(one - A1));
-        MatrixXf dW1 =
-            dZ1 * Map<MatrixXf>(train_images + j * 784, 784, 1).transpose();
-        MatrixXf db1 = dZ1;
+        dZ1 = dZ1.cwiseProduct(A1.unaryExpr(&relu_prime));
+        MatrixXf dW1 = dZ1 * X.transpose() / num_images;
+        MatrixXf db1 = dZ1.rowwise().sum() / num_images;
 
         // update weights and biases
-        W1 -= learning_rate * dW1;
-        b1 -= learning_rate * db1;
-        W2 -= learning_rate * dW2;
-        b2 -= learning_rate * db2;
-        W3 -= learning_rate * dW3;
-        b3 -= learning_rate * db3;
-        W4 -= learning_rate * dW4;
-        b4 -= learning_rate * db4;
-    }
+        
+        W5 = W5 - learning_rate * dW5;
+        b5 = b5 - learning_rate * db5;
+        W4 = W4 - learning_rate * dW4;
+        b4 = b4 - learning_rate * db4;
+        W3 = W3 - learning_rate * dW3;
+        b3 = b3 - learning_rate * db3;
+        W2 = W2 - learning_rate * dW2;
+        b2 = b2 - learning_rate * db2;
+        W1 = W1 - learning_rate * dW1;
+        b1 = b1 - learning_rate * db1;
     }
 
     auto finish = std::chrono::high_resolution_clock::now();
@@ -252,13 +294,15 @@ int main() {
     for (int i = 0; i < num_images; i++) {
         // forward propagation
         Z1 = W1 * Map<MatrixXf>(test_images + i * 784, 784, 1) + b1;
-        A1 = Z1.unaryExpr(&sigmoid);
+        A1 = Z1.unaryExpr(&relu);
         Z2 = W2 * A1 + b2;
-        A2 = Z2.unaryExpr(&sigmoid);
+        A2 = Z2.unaryExpr(&relu);
         Z3 = W3 * A2 + b3;
-        A3 = Z3.unaryExpr(&sigmoid);
+        A3 = Z3.unaryExpr(&relu);
         Z4 = W4 * A3 + b4;
-        A4 = Z4.unaryExpr(&sigmoid);
+        A4 = Z4.unaryExpr(&relu);
+        Z5 = W5 * A4 + b5;
+        A5 = minemax(Z5, 10, 1);
 
         int max_index = 0;
         float max_value = A4(0, 0);
@@ -274,6 +318,8 @@ int main() {
     }
 
     std::cout << "\n\naccuracy: " << (float)correct / num_images << std::endl;
+
+    free(test_images_raw);
 
     return 0;
 }
