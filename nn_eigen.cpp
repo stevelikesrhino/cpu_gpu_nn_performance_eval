@@ -190,6 +190,7 @@ int main() {
 
     // prepare for parallel
     Eigen::initParallel();
+    Eigen::setNbThreads(8);
     // main loop
     std::cout << "start propagating" << std::endl;
     //timer
